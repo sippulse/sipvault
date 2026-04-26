@@ -1,0 +1,35 @@
+[server]
+# Server address in HOST:PORT format (required)
+address = 10.0.0.1:9060
+
+# Customer identifier, must match the receiving server's customer registry (required)
+customer_id = acme
+
+# Authentication token, must match the receiving server's customer registry (required)
+token = REPLACE_WITH_REAL_TOKEN
+
+[capture]
+# Capture mode: auto, ebpf, or pcap
+# auto = ebpf if kernel >= 4.18, pcap otherwise
+mode = auto
+
+# Comma-separated list of SIP ports
+sip_ports = 5060
+
+# Network interface (auto-detected from default route if empty)
+interface =
+
+# OpenSIPS log file (used in pcap mode; empty disables file tailing)
+log_file = /var/log/opensips.log
+
+# RTP port range — must match RTPProxy / RTPEngine configuration
+rtp_port_min = 10000
+rtp_port_max = 30000
+
+[buffer]
+# On-disk ring buffer used when the upstream TCP connection drops
+path = /var/lib/sipvault/buffer.dat
+max_size = 104857600
+
+[logging]
+level = info

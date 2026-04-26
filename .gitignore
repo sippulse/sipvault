@@ -1,0 +1,12 @@
+bin/
+*.exe
+*.o
+*.so
+
+.idea/
+.vscode/
+*.swp
+*.swo
+
+.DS_Store
+Thumbs.db
