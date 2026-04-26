@@ -17,6 +17,31 @@ import (
 	"github.com/sippulse/sipvault/internal/tracker"
 )
 
+func TestIsSIPKeepAlive(t *testing.T) {
+	cases := []struct {
+		name string
+		data []byte
+		want bool
+	}{
+		{"single CRLF", []byte("\r\n"), true},
+		{"double CRLF (RFC 5626)", []byte("\r\n\r\n"), true},
+		{"single LF", []byte("\n"), true},
+		{"empty", []byte{}, true},
+		{"whitespace only", []byte(" \t"), true},
+		{"INVITE", []byte("INVITE sip:bob@ex SIP/2.0\r\n"), false},
+		{"OPTIONS short", []byte("OPTI"), false}, // 4 bytes, non-whitespace
+		{"larger than threshold", []byte("\r\n\r\n\r\n"), false},
+		{"single 'a'", []byte("a"), false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := isSIPKeepAlive(c.data); got != c.want {
+				t.Fatalf("isSIPKeepAlive(%q) = %v, want %v", c.data, got, c.want)
+			}
+		})
+	}
+}
+
 // MockSource implements Source using a channel.
 type MockSource struct {
 	ch chan CaptureEvent

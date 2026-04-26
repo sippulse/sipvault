@@ -97,9 +97,28 @@ func (r *Reader) Run(ctx context.Context) error {
 	}
 }
 
+// isSIPKeepAlive reports whether a payload is a SIP keep-alive ping
+// (RFC 5626 §3.5.1: a single CRLF or double-CRLF, sometimes with stray
+// whitespace). These appear constantly on long-lived connections and
+// would otherwise spam the log as "SIP parse error".
+func isSIPKeepAlive(data []byte) bool {
+	if len(data) > 4 {
+		return false
+	}
+	for _, b := range data {
+		if b != '\r' && b != '\n' && b != ' ' && b != '\t' {
+			return false
+		}
+	}
+	return true
+}
+
 // handleSIP parses a SIP message, updates the tracker, extracts SDP
 // SSRC mappings, and sends a DATA_SIP frame.
 func (r *Reader) handleSIP(ev CaptureEvent) {
+	if isSIPKeepAlive(ev.Data) {
+		return
+	}
 	msg, err := sip.ParseMessage(ev.Data)
 	if err != nil {
 		n := len(ev.Data); if n > 60 { n = 60 }

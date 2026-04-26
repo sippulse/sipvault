@@ -105,26 +105,21 @@ func (s *Source) run() {
 		}
 
 		pktCount++
-		// Log every packet for debugging
 		raw := packet.Data()
 		isInvite := bytes.Contains(raw, []byte("INVITE sip:"))
-		if isInvite {
-			log.Printf("pcap RAW: INVITE found in packet #%d (%d bytes)", pktCount, len(raw))
-		}
 
 		ev, ok := s.decodePacket(packet)
 		if !ok {
 			decodeFailCount++
 			if isInvite {
+				// Failed decode of a packet that looks like an INVITE is
+				// a real bug worth surfacing.
 				log.Printf("pcap: INVITE packet FAILED decode! pkt #%d", pktCount)
 			}
 			continue
 		}
 		if ev.Type == capture.EventSIP {
 			sipCount++
-			if bytes.Contains(ev.Data, []byte("INVITE ")) {
-				log.Printf("pcap: INVITE classified as SIP (%d bytes) src=%s:%d dst=%s:%d", len(ev.Data), ev.SrcIP, ev.SrcPort, ev.DstIP, ev.DstPort)
-			}
 		} else if isInvite {
 			log.Printf("pcap: INVITE classified as type=%d (not SIP!) src=%s:%d dst=%s:%d", ev.Type, ev.SrcIP, ev.SrcPort, ev.DstIP, ev.DstPort)
 		}
