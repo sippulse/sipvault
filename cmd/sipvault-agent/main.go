@@ -92,9 +92,7 @@ func main() {
 
 	switch mode {
 	case "ebpf":
-		// eBPF source would be initialized here (requires root + kernel >= 4.18)
-		// For now, placeholder — eBPF loader not yet implemented
-		log.Fatal("eBPF capture mode not yet implemented — use pcap mode")
+		log.Fatal("eBPF capture is on the roadmap but not implemented yet — set capture.mode = pcap (or remove the key to use auto, which currently resolves to pcap)")
 
 	case "pcap":
 		iface := cfg.Interface

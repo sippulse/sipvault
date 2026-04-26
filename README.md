@@ -5,7 +5,7 @@
 
 A lightweight Go agent that runs on a SIP proxy host (OpenSIPS, Kamailio, Asterisk, FreeSWITCH) and ships per-call evidence — SIP signaling, raw RTCP, an RTP-derived quality report, and Call-ID-sliced application logs — to a remote collector over a custom binary wire protocol.
 
-The agent is the open-source side of the SIP VAULT product line. It captures only INVITE dialogs — REGISTER/OPTIONS/SUBSCRIBE/NOTIFY are filtered out. Two capture backends are supported: **eBPF** (XDP/tc + kprobe, kernel ≥ 4.18) and **libpcap** (any Linux back to CentOS 6 / Ubuntu 14.04). The mode is auto-selected at startup based on kernel version, or forced via config.
+The agent is the open-source side of the SIP VAULT product line. It captures only INVITE dialogs — REGISTER/OPTIONS/SUBSCRIBE/NOTIFY are filtered out. Capture is currently libpcap-based (any Linux back to CentOS 6 / Ubuntu 14.04); an eBPF backend (XDP/tc + kprobe, kernel ≥ 4.18) is on the roadmap but **not implemented yet** — see [Roadmap](#roadmap).
 
 ## What the agent ships per call
 
@@ -49,22 +49,30 @@ For automated installation with systemd / SysV-init wiring, see [`install/instal
 
 ## Capture Modes
 
-| Mode | Kernel | Log capture | SIP/RTCP capture | Build |
-|------|--------|-------------|------------------|-------|
-| **eBPF** | ≥ 4.18 | kprobe on `sendmsg` | XDP/tc BPF programs | `make build` (no CGO) |
-| **pcap** | Any | File tailing (`log_file` config) | libpcap on SIP/RTP ports | `make build-pcap` (needs `libpcap-dev`) |
-| **auto** | — | Auto-selects based on kernel version | — | — |
+| Mode | Status | Kernel | Log capture | SIP/RTCP capture | Build |
+|------|--------|--------|-------------|------------------|-------|
+| **pcap** | ✅ Implemented | Any | File tailing (`log_file` config) | libpcap on SIP/RTP ports | `make build-pcap` (needs `libpcap-dev`) |
+| **eBPF** | 🚧 Planned | ≥ 4.18 | kprobe on `sendmsg` | XDP/tc BPF programs | — |
+| **auto** | ✅ Implemented | — | Currently resolves to `pcap`. Will resolve to `ebpf` on capable kernels once that backend lands. | — | — |
+
+> The default `make build` target produces a binary that requires `mode = pcap` in the config. Building without the `pcap` tag is currently only useful as a stub — the resulting binary fails at startup with a clear error. This will change when the eBPF backend is implemented.
 
 ## Build Matrix
 
 | Target | Output | Notes |
 |--------|--------|-------|
-| `make build` | `bin/sipvault-agent` | Native, eBPF-capable, CGO disabled |
-| `make build-pcap` | `bin/sipvault-agent-pcap` | Requires `libpcap-dev`, CGO enabled |
-| `make build-release` | `bin/sipvault-agent-linux-{amd64,arm64}` | Cross-compiled, stripped |
+| `make build-pcap` | `bin/sipvault-agent-pcap` | **Recommended today.** libpcap-based capture, requires `libpcap-dev`, CGO enabled |
 | `make build-pcap-release` | `bin/sipvault-agent-pcap-linux-amd64` | Cross-compiled, CGO + libpcap |
+| `make build` | `bin/sipvault-agent` | Stub binary — pcap is excluded; fails at startup until eBPF lands. Useful for compile-only smoke tests |
+| `make build-release` | `bin/sipvault-agent-linux-{amd64,arm64}` | Same caveat as `make build` — stub for now |
 | `make test` | — | `go test -race ./...` |
 | `make lint` | — | `golangci-lint run ./...` |
+
+## Roadmap
+
+- **eBPF capture backend.** XDP/tc programs for SIP/RTCP/RTP and a kprobe on `sendmsg` for log capture, packaged as a cgo-free static binary. Targets kernel ≥ 4.18 with BTF/CO-RE. Not yet implemented; tracked in the issue tracker.
+- **Live timeseries in the RTP-fallback quality report.** Today only a per-call summary is emitted; the goal is 5-second buckets matching the RTCP-derived report shape.
+- **Codec-aware MOS in the agent.** Currently fixed at G.711 impairment; the collector re-derives codec-specific MOS from raw jitter/loss.
 
 ## Documentation
 

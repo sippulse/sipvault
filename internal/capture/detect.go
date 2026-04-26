@@ -6,25 +6,29 @@ import (
 	"strings"
 )
 
-// DetectMode determines whether to use eBPF or pcap capture.
-// Returns "ebpf" or "pcap".
+// DetectMode determines which capture backend to use when the operator
+// selects "auto". eBPF is on the roadmap but not yet implemented, so this
+// always returns "pcap" today. The kernel-version helpers below are kept
+// because they will gate the eBPF path once it lands.
 func DetectMode() string {
+	_, _ = kernelVersion()
+	return "pcap"
+}
+
+// kernelHasEBPFSupport reports whether the running kernel meets the
+// minimum requirements for the (not-yet-implemented) eBPF backend.
+// Currently unused by DetectMode; retained for the eBPF work in flight.
+func kernelHasEBPFSupport() bool {
 	major, minor := kernelVersion()
-
-	// eBPF perf event arrays require kernel 4.18+.
 	if major < 4 || (major == 4 && minor < 18) {
-		return "pcap"
+		return false
 	}
-
-	// Check for BTF support (modern eBPF with CO-RE).
 	if _, err := os.Stat("/sys/kernel/btf/vmlinux"); err != nil {
-		// BTF not available — check for basic BPF support.
 		if _, err := os.Stat("/proc/sys/kernel/unprivileged_bpf_disabled"); err != nil {
-			return "pcap"
+			return false
 		}
 	}
-
-	return "ebpf"
+	return true
 }
 
 // kernelVersion returns the major and minor kernel version numbers

@@ -44,10 +44,10 @@ func TestParseKernelVersion_MajorMinorOnly(t *testing.T) {
 	}
 }
 
-func TestDetectMode_ReturnsValidValue(t *testing.T) {
-	// On any system, DetectMode should return one of the two valid values.
-	mode := DetectMode()
-	if mode != "ebpf" && mode != "pcap" {
-		t.Fatalf("unexpected mode: %q", mode)
+func TestDetectMode_AlwaysPcapForNow(t *testing.T) {
+	// eBPF is not yet implemented; auto-detect must always resolve to pcap
+	// so a fresh install on a modern kernel does not hard-fail at startup.
+	if mode := DetectMode(); mode != "pcap" {
+		t.Fatalf("DetectMode() = %q, want %q (eBPF backend not implemented yet)", mode, "pcap")
 	}
 }

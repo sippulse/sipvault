@@ -56,22 +56,24 @@ echo "OS: $(cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d'"' -f2 |
 echo "Kernel: $(uname -r)"
 echo "Arch: $ARCH"
 
-# Determine binary variant
-if [[ "$CAPTURE_MODE" == "auto" ]]; then
-    if [[ "$KERNEL_MAJOR" -gt 4 ]] || [[ "$KERNEL_MAJOR" -eq 4 && "$KERNEL_MINOR" -ge 18 ]]; then
-        BINARY_VARIANT="sipvault-agent-linux-${ARCH}"
-        DETECTED_MODE="ebpf"
-    else
+# Determine binary variant.
+# eBPF capture is on the roadmap but not implemented yet, so every install
+# path resolves to the libpcap binary. Auto and explicit pcap behave the
+# same; an explicit "ebpf" request is rejected with a clear error.
+case "$CAPTURE_MODE" in
+    auto|pcap)
         BINARY_VARIANT="sipvault-agent-pcap-linux-${ARCH}"
         DETECTED_MODE="pcap"
-    fi
-elif [[ "$CAPTURE_MODE" == "pcap" ]]; then
-    BINARY_VARIANT="sipvault-agent-pcap-linux-${ARCH}"
-    DETECTED_MODE="pcap"
-else
-    BINARY_VARIANT="sipvault-agent-linux-${ARCH}"
-    DETECTED_MODE="ebpf"
-fi
+        ;;
+    ebpf)
+        echo "ERROR: --mode ebpf is not implemented yet. Use --mode pcap (or omit --mode to use auto, which currently resolves to pcap)." >&2
+        exit 1
+        ;;
+    *)
+        echo "ERROR: unknown --mode value: ${CAPTURE_MODE}" >&2
+        exit 1
+        ;;
+esac
 
 echo "Capture mode: $DETECTED_MODE"
 echo ""

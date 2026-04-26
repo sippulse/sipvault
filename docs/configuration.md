@@ -17,7 +17,8 @@ token = securetoken123
 
 [capture]
 # Capture mode: auto, ebpf, or pcap (default: auto)
-# auto = select based on kernel version (ebpf if >= 4.18, pcap otherwise)
+# auto currently resolves to "pcap" on every kernel (eBPF is on the roadmap
+# but not implemented; setting mode = ebpf will hard-fail at startup).
 mode = auto
 
 # Comma-separated SIP ports to monitor (default: 5060)
@@ -82,14 +83,16 @@ level = info
 
 ## Capture Mode Comparison
 
-| Feature | eBPF Mode | pcap Mode |
+> **Status:** only `pcap` is implemented today. `eBPF` is on the roadmap. The `auto` selector currently resolves to `pcap` on every kernel; setting `mode = ebpf` explicitly will hard-fail at startup with an error directing you to `pcap`.
+
+| Feature | pcap Mode (✅ implemented) | eBPF Mode (🚧 planned) |
 |---|---|---|
-| Kernel requirement | >= 4.18 | Any |
-| SIP/RTCP capture | XDP/tc BPF programs | libpcap on SIP/RTP ports |
-| Log capture | kprobe on `sendmsg` | File tailing (`log_file` config) |
-| Build | `make build` (no CGO) | `make build-pcap` (needs `libpcap-dev`) |
-| Capabilities | `CAP_BPF` + `CAP_NET_ADMIN` + `CAP_SYS_PTRACE` | root or `CAP_NET_RAW` |
-| Supported OS | Ubuntu 18.04+, Debian 10+, CentOS 8+ | CentOS 6+, Debian 7+, Ubuntu 14.04+ |
+| Kernel requirement | Any | >= 4.18 (BTF/CO-RE) |
+| SIP/RTCP capture | libpcap on SIP/RTP ports | XDP/tc BPF programs |
+| Log capture | File tailing (`log_file` config) | kprobe on `sendmsg` |
+| Build | `make build-pcap` (needs `libpcap-dev`) | TBD (no CGO) |
+| Capabilities | root or `CAP_NET_RAW` | `CAP_BPF` + `CAP_NET_ADMIN` + `CAP_SYS_PTRACE` |
+| Supported OS | CentOS 6+, Debian 7+, Ubuntu 14.04+ | Ubuntu 18.04+, Debian 10+, CentOS 8+ |
 
 ## Example: pcap Mode on CentOS 6/7
 
