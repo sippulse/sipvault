@@ -17,8 +17,9 @@ token = securetoken123
 
 [capture]
 # Capture mode: auto, ebpf, or pcap (default: auto)
-# auto currently resolves to "pcap" on every kernel (eBPF is on the roadmap
-# but not implemented; setting mode = ebpf will hard-fail at startup).
+# auto resolves to "pcap" — operators must set mode = ebpf explicitly to
+# opt in. The ebpf backend requires a binary built with `-tags ebpf` and
+# CAP_NET_RAW (or root) at runtime.
 mode = auto
 
 # Comma-separated SIP ports to monitor (default: 5060)
@@ -83,16 +84,19 @@ level = info
 
 ## Capture Mode Comparison
 
-> **Status:** only `pcap` is implemented today. `eBPF` is on the roadmap. The `auto` selector currently resolves to `pcap` on every kernel; setting `mode = ebpf` explicitly will hard-fail at startup with an error directing you to `pcap`.
+Both backends are implemented and emit the same wire-protocol output. The `auto` selector resolves to `pcap` for upgrade safety; `mode = ebpf` is opt-in.
 
-| Feature | pcap Mode (✅ implemented) | eBPF Mode (🚧 planned) |
+| Feature | pcap Mode | ebpf Mode (v1 = cBPF socket filter) |
 |---|---|---|
-| Kernel requirement | Any | >= 4.18 (BTF/CO-RE) |
-| SIP/RTCP capture | libpcap on SIP/RTP ports | XDP/tc BPF programs |
-| Log capture | File tailing (`log_file` config) | kprobe on `sendmsg` |
-| Build | `make build-pcap` (needs `libpcap-dev`) | TBD (no CGO) |
-| Capabilities | root or `CAP_NET_RAW` | `CAP_BPF` + `CAP_NET_ADMIN` + `CAP_SYS_PTRACE` |
-| Supported OS | CentOS 6+, Debian 7+, Ubuntu 14.04+ | Ubuntu 18.04+, Debian 10+, CentOS 8+ |
+| Kernel requirement | Any | Linux 3.x+ (any modern kernel; `SO_ATTACH_FILTER` since 3.0) |
+| SIP/RTCP capture | libpcap on SIP/RTP ports | AF_PACKET raw socket + in-kernel cBPF filter |
+| Log capture | File tailing (`log_file` config) | File tailing (same as pcap; kprobe path on roadmap) |
+| Runtime dependencies | `libpcap0.8` package | None (pure Go static binary) |
+| Build | `make build-pcap` (needs `libpcap-dev` + CGO) | `make build-ebpf` (no CGO, no clang) |
+| Capabilities | root or `CAP_NET_RAW` | root or `CAP_NET_RAW` |
+| Supported OS | CentOS 6+, Debian 7+, Ubuntu 14.04+ | Any modern Linux |
+
+The ebpf backend installs a minimal kernel filter that accepts IPv4 UDP traffic (and IPv4 fragments for reassembly), and performs port-based SIP/RTP/RTCP classification in userspace. This removes libpcap from the runtime dependency chain and produces a smaller, fully-static, CGO-free binary. Future revisions will move classification into the kernel via true eBPF programs (XDP, TC clsact, ringbuf maps) — see the project roadmap.
 
 ## Example: pcap Mode on CentOS 6/7
 

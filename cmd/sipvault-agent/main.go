@@ -13,6 +13,7 @@ import (
 	"github.com/sippulse/sipvault/internal/buffer"
 	"github.com/sippulse/sipvault/internal/capture"
 	"github.com/sippulse/sipvault/internal/config"
+	"github.com/sippulse/sipvault/internal/ebpf"
 	"github.com/sippulse/sipvault/internal/logfilter"
 	"github.com/sippulse/sipvault/internal/logtail"
 	"github.com/sippulse/sipvault/internal/mux"
@@ -92,7 +93,14 @@ func main() {
 
 	switch mode {
 	case "ebpf":
-		log.Fatal("eBPF capture is on the roadmap but not implemented yet — set capture.mode = pcap (or remove the key to use auto, which currently resolves to pcap)")
+		if !ebpf.Available {
+			log.Fatal("eBPF backend not compiled in: rebuild with `-tags ebpf` on a Linux host, or set capture.mode = pcap")
+		}
+		ebpfSrc, err := ebpf.NewSource(cfg.Interface, cfg.SIPPorts, cfg.RTPPortMin, cfg.RTPPortMax, trk.NeedsRTPCapture)
+		if err != nil {
+			log.Fatalf("ebpf: %v", err)
+		}
+		sources = append(sources, ebpfSrc)
 
 	case "pcap":
 		iface := cfg.Interface

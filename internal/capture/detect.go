@@ -7,17 +7,18 @@ import (
 )
 
 // DetectMode determines which capture backend to use when the operator
-// selects "auto". eBPF is on the roadmap but not yet implemented, so this
-// always returns "pcap" today. The kernel-version helpers below are kept
-// because they will gate the eBPF path once it lands.
+// selects "auto". The eBPF backend is opt-in via explicit mode = ebpf;
+// auto-detect intentionally pins to pcap so existing installs are not
+// silently switched on upgrade. To use eBPF, set capture.mode = ebpf in
+// the agent config and run a binary built with `-tags ebpf`.
 func DetectMode() string {
 	_, _ = kernelVersion()
 	return "pcap"
 }
 
 // kernelHasEBPFSupport reports whether the running kernel meets the
-// minimum requirements for the (not-yet-implemented) eBPF backend.
-// Currently unused by DetectMode; retained for the eBPF work in flight.
+// minimum requirements for the eBPF backend. Currently advisory only —
+// the eBPF source itself surfaces a clear error if the kernel is too old.
 func kernelHasEBPFSupport() bool {
 	major, minor := kernelVersion()
 	if major < 4 || (major == 4 && minor < 18) {

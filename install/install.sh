@@ -56,18 +56,17 @@ echo "OS: $(cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d'"' -f2 |
 echo "Kernel: $(uname -r)"
 echo "Arch: $ARCH"
 
-# Determine binary variant.
-# eBPF capture is on the roadmap but not implemented yet, so every install
-# path resolves to the libpcap binary. Auto and explicit pcap behave the
-# same; an explicit "ebpf" request is rejected with a clear error.
+# Determine binary variant. The pcap backend is the default; eBPF is opt-in
+# and ships as a sibling binary. Auto resolves to pcap to keep upgrade
+# behaviour stable for existing installs.
 case "$CAPTURE_MODE" in
     auto|pcap)
         BINARY_VARIANT="sipvault-agent-pcap-linux-${ARCH}"
         DETECTED_MODE="pcap"
         ;;
     ebpf)
-        echo "ERROR: --mode ebpf is not implemented yet. Use --mode pcap (or omit --mode to use auto, which currently resolves to pcap)." >&2
-        exit 1
+        BINARY_VARIANT="sipvault-agent-ebpf-linux-${ARCH}"
+        DETECTED_MODE="ebpf"
         ;;
     *)
         echo "ERROR: unknown --mode value: ${CAPTURE_MODE}" >&2

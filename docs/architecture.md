@@ -4,7 +4,7 @@
 
 The sipvault-agent is a single Go binary that runs on customer SIP proxy servers (OpenSIPS, Kamailio, Asterisk, FreeSWITCH). It captures SIP signaling, RTCP quality reports, RTP headers (when RTCP is unavailable), and application logs — then sends them to the sipvault-server via a custom binary wire protocol over TCP.
 
-> **Capture backend status (current):** only the libpcap-based path is implemented. The eBPF backend described later in this document is on the roadmap; the `mode = ebpf` config value is reserved but currently fails at startup with a clear error. The `auto` selector resolves to `pcap` until the eBPF backend lands.
+> **Capture backends.** Two implementations of the `Source` interface ship in this repo: the libpcap-based path (`internal/pcap`) and a kernel BPF socket-filter path (`internal/ebpf`). Both produce the same `CaptureEvent` shape, so everything downstream — Reader, tracker, log filter, RTP/RTCP analysis, wire protocol — is identical. v1 of the eBPF backend uses a cBPF socket filter attached via `SO_ATTACH_FILTER` to an `AF_PACKET` raw socket; subsequent revisions will move toward true eBPF features (XDP fast path, kprobes for log capture, ringbuf maps). The `auto` selector resolves to `pcap` for upgrade-safety reasons; operators must set `capture.mode = ebpf` explicitly to opt in.
 
 ## Data Flow
 

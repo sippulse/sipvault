@@ -32,6 +32,19 @@ jobs:
       - run: go build -tags pcap -o bin/sipvault-agent-pcap ./cmd/sipvault-agent
       - run: go test -race -tags pcap ./...
 
+  test-ebpf:
+    name: test (ebpf)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+      - run: go build -tags ebpf -o bin/sipvault-agent-ebpf ./cmd/sipvault-agent
+      - run: go vet -tags ebpf ./...
+      - run: go test -race -tags ebpf ./...
+
   lint:
     name: lint
     runs-on: ubuntu-latest

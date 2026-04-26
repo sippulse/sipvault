@@ -5,7 +5,10 @@
 
 A lightweight Go agent that runs on a SIP proxy host (OpenSIPS, Kamailio, Asterisk, FreeSWITCH) and ships per-call evidence — SIP signaling, raw RTCP, an RTP-derived quality report, and Call-ID-sliced application logs — to a remote collector over a custom binary wire protocol.
 
-The agent is the open-source side of the SIP VAULT product line. It captures only INVITE dialogs — REGISTER/OPTIONS/SUBSCRIBE/NOTIFY are filtered out. Capture is currently libpcap-based (any Linux back to CentOS 6 / Ubuntu 14.04); an eBPF backend (XDP/tc + kprobe, kernel ≥ 4.18) is on the roadmap but **not implemented yet** — see [Roadmap](#roadmap).
+The agent is the open-source side of the SIP VAULT product line. It captures only INVITE dialogs — REGISTER/OPTIONS/SUBSCRIBE/NOTIFY are filtered out. Two capture backends are available:
+
+- **`pcap`** (default) — libpcap-based, works on any Linux back to CentOS 6 / Ubuntu 14.04.
+- **`ebpf`** (opt-in) — kernel BPF socket filter on AF_PACKET, no libpcap, no CGO. v1 uses cBPF; XDP / kprobe-based log capture / ringbuf metadata are on the [roadmap](#roadmap).
 
 ## What the agent ships per call
 
@@ -51,26 +54,31 @@ For automated installation with systemd / SysV-init wiring, see [`install/instal
 
 | Mode | Status | Kernel | Log capture | SIP/RTCP capture | Build |
 |------|--------|--------|-------------|------------------|-------|
-| **pcap** | ✅ Implemented | Any | File tailing (`log_file` config) | libpcap on SIP/RTP ports | `make build-pcap` (needs `libpcap-dev`) |
-| **eBPF** | 🚧 Planned | ≥ 4.18 | kprobe on `sendmsg` | XDP/tc BPF programs | — |
-| **auto** | ✅ Implemented | — | Currently resolves to `pcap`. Will resolve to `ebpf` on capable kernels once that backend lands. | — | — |
+| **pcap** | ✅ Implemented | Any | File tailing (`log_file` config) | libpcap on SIP/RTP ports | `make build-pcap` (needs `libpcap-dev` + CGO) |
+| **ebpf** | ✅ Implemented (v1: cBPF socket filter) | Linux 3.x+ (any modern) | File tailing (same as pcap) | AF_PACKET raw socket + in-kernel BPF filter, no libpcap | `make build-ebpf` (pure Go, no CGO, no clang) |
+| **auto** | ✅ Implemented | — | — | Resolves to `pcap`. Operators must set `mode = ebpf` explicitly to opt in. | — |
 
-> The default `make build` target produces a binary that requires `mode = pcap` in the config. Building without the `pcap` tag is currently only useful as a stub — the resulting binary fails at startup with a clear error. This will change when the eBPF backend is implemented.
+> v1 of the eBPF backend uses a classic-BPF (cBPF) socket filter — the same instruction set libpcap generates internally — attached via `SO_ATTACH_FILTER` to an `AF_PACKET` raw socket. This removes libpcap from the runtime dependency chain and produces a smaller, fully-static, CGO-free binary. True eBPF features (XDP, kprobes for kernel-side log capture, ringbuf-based metadata) are on the [Roadmap](#roadmap).
+>
+> Permissions: the eBPF backend needs `CAP_NET_RAW` (or root). Running under systemd, set `AmbientCapabilities=CAP_NET_RAW` in the unit file.
 
 ## Build Matrix
 
 | Target | Output | Notes |
 |--------|--------|-------|
-| `make build-pcap` | `bin/sipvault-agent-pcap` | **Recommended today.** libpcap-based capture, requires `libpcap-dev`, CGO enabled |
+| `make build-pcap` | `bin/sipvault-agent-pcap` | libpcap-based capture, requires `libpcap-dev`, CGO enabled |
 | `make build-pcap-release` | `bin/sipvault-agent-pcap-linux-amd64` | Cross-compiled, CGO + libpcap |
-| `make build` | `bin/sipvault-agent` | Stub binary — pcap is excluded; fails at startup until eBPF lands. Useful for compile-only smoke tests |
-| `make build-release` | `bin/sipvault-agent-linux-{amd64,arm64}` | Same caveat as `make build` — stub for now |
+| `make build-ebpf` | `bin/sipvault-agent-ebpf` | eBPF (cBPF socket filter) backend. Pure Go, no CGO, no clang |
+| `make build-ebpf-release` | `bin/sipvault-agent-ebpf-linux-{amd64,arm64}` | Cross-compiled eBPF binaries, stripped |
+| `make build` | `bin/sipvault-agent` | Default: neither backend compiled in. `mode = pcap` and `mode = ebpf` both fail with a clear error. Useful for compile-only smoke tests |
+| `make build-release` | `bin/sipvault-agent-linux-{amd64,arm64}` | Same caveat as `make build` |
 | `make test` | — | `go test -race ./...` |
+| `make test-ebpf` | — | `go test -tags ebpf ./...` |
 | `make lint` | — | `golangci-lint run ./...` |
 
 ## Roadmap
 
-- **eBPF capture backend.** XDP/tc programs for SIP/RTCP/RTP and a kprobe on `sendmsg` for log capture, packaged as a cgo-free static binary. Targets kernel ≥ 4.18 with BTF/CO-RE. Not yet implemented; tracked in the issue tracker.
+- **True-eBPF feature expansion.** v1 ships a cBPF socket filter; future revisions will move to eBPF programs (XDP for fast-path ingress, TC clsact for symmetric ingress/egress, kprobes for kernel-side log capture, ringbuf maps for richer metadata). The userspace Source interface is independent of the in-kernel filter strategy, so this can land iteratively.
 - **Live timeseries in the RTP-fallback quality report.** Today only a per-call summary is emitted; the goal is 5-second buckets matching the RTCP-derived report shape.
 - **Codec-aware MOS in the agent.** Currently fixed at G.711 impairment; the collector re-derives codec-specific MOS from raw jitter/loss.
 
