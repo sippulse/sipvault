@@ -1,5 +1,8 @@
 # sipvault-agent
 
+> [!WARNING]
+> **Project status: alpha / experimental.** This code is published for the OpenSIPS Summit and is under active development. APIs, the wire protocol, the configuration schema, and the on-disk buffer format may change without notice. There are no stability or backwards-compatibility guarantees, no published security advisories, and no production support. Use at your own risk, do not run on critical infrastructure, and pin to a specific commit if you do try it. Bug reports and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 A lightweight Go agent that runs on a SIP proxy host (OpenSIPS, Kamailio, Asterisk, FreeSWITCH) and ships per-call SIP signaling, RTCP quality reports, RTP-derived metrics, and application logs to a remote collector over a custom binary wire protocol.
 
 The agent is the open-source side of the SIP VAULT product line. It captures only INVITE dialogs — REGISTER/OPTIONS/SUBSCRIBE/NOTIFY are filtered out. Two capture backends are supported: **eBPF** (XDP/tc + kprobe, kernel ≥ 4.18) and **libpcap** (any Linux back to CentOS 6 / Ubuntu 14.04). The mode is auto-selected at startup based on kernel version, or forced via config.
