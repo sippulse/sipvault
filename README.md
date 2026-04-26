@@ -3,13 +3,24 @@
 > [!WARNING]
 > **Project status: alpha / experimental.** This code is published for the OpenSIPS Summit and is under active development. APIs, the wire protocol, the configuration schema, and the on-disk buffer format may change without notice. There are no stability or backwards-compatibility guarantees, no published security advisories, and no production support. Use at your own risk, do not run on critical infrastructure, and pin to a specific commit if you do try it. Bug reports and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-A lightweight Go agent that runs on a SIP proxy host (OpenSIPS, Kamailio, Asterisk, FreeSWITCH) and ships per-call SIP signaling, RTCP quality reports, RTP-derived metrics, and application logs to a remote collector over a custom binary wire protocol.
+A lightweight Go agent that runs on a SIP proxy host (OpenSIPS, Kamailio, Asterisk, FreeSWITCH) and ships per-call evidence — SIP signaling, raw RTCP, an RTP-derived quality report, and Call-ID-sliced application logs — to a remote collector over a custom binary wire protocol.
 
 The agent is the open-source side of the SIP VAULT product line. It captures only INVITE dialogs — REGISTER/OPTIONS/SUBSCRIBE/NOTIFY are filtered out. Two capture backends are supported: **eBPF** (XDP/tc + kprobe, kernel ≥ 4.18) and **libpcap** (any Linux back to CentOS 6 / Ubuntu 14.04). The mode is auto-selected at startup based on kernel version, or forced via config.
 
+## What the agent ships per call
+
+| Artifact | Wire frame | Source | When |
+|---|---|---|---|
+| **SIP messages** | `DATA_SIP` | libpcap / eBPF on `sip_ports` | Live, frame-batched |
+| **RTCP packets** | `DATA_RTCP` | libpcap / eBPF on RTP port range | Live, forwarded raw |
+| **Log lines (Call-ID-sliced)** | `DATA_LOG` | Log file tail (pcap mode) or `sendmsg` kprobe (eBPF mode) | Live, only lines matching an active Call-ID |
+| **RTP-derived quality report** | `DATA_QUALITY` | Per-SSRC analyzer (sequence gaps + RFC 3550 jitter) → MOS/jitter/loss per direction (`uac` / `uas`) as JSON | On BYE/CANCEL, once per call |
+
+The quality report is generated locally from RTP headers, so you get a MOS estimate even when RTCP is missing or one-sided. When RTCP is present it is forwarded raw alongside the agent-computed report; the collector decides which to use.
+
 ## Features
 
-- INVITE-dialog-scoped capture: SIP, RTCP, RTP-derived stats (jitter / loss per SSRC), and a Call-ID-filtered log tail
+- INVITE-dialog-scoped capture, with strict Call-ID-based slicing for logs (no log lines are shipped that don't belong to a tracked call)
 - Single static Go binary; eBPF mode has zero runtime dependencies (no libpcap, no CGO)
 - 100 MB on-disk ring buffer survives upstream outages and replays on reconnect
 - Frame-batched TCP wire protocol (64 frames or 5 ms flush) with HEARTBEAT keepalive and exponential-backoff reconnect
